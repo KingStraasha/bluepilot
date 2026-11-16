@@ -13,6 +13,7 @@ from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.navigation import NavigationPanel, PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.widgets.steering_debug_panel import SteeringDebugController, VerticalSwipeDetector
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
@@ -173,6 +174,9 @@ class AugmentedRoadView(CameraView):
 
     # Bookmark icon with swipe gesture
     self._bookmark_icon = BookmarkIcon(bookmark_callback)
+    self._steering_debug = SteeringDebugController(compact=True, include_curvature=False)
+    self._swipe_detector = VerticalSwipeDetector(self._steering_debug.open_if_onroad)
+    self._swipe_detector.set_enabled(lambda: self.enabled and self._touch_valid())
 
     self._navigation = NavigationPanel()
     self._model_renderer = ModelRenderer()
@@ -192,6 +196,17 @@ class AugmentedRoadView(CameraView):
     """Check if currently swiping left (for scroller to disable)."""
     return self._bookmark_icon.is_swiping_left()
 
+  def is_swiping_down(self) -> bool:
+    """Check if currently swiping down (for scroller to disable)."""
+    return self._swipe_detector.is_swiping_down()
+
+  def _update_layout_rects(self) -> None:
+    self._swipe_detector.set_rect(self._rect)
+
+  def set_parent_rect(self, parent_rect: rl.Rectangle) -> None:
+    super().set_parent_rect(parent_rect)
+    self._swipe_detector.set_parent_rect(parent_rect)
+
   def _update_state(self):
     super()._update_state()
 
@@ -204,8 +219,10 @@ class AugmentedRoadView(CameraView):
       self._offroad_label.set_text("start the car to\nuse sunnypilot")
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    # Don't trigger click callback if bookmark was triggered
-    if not self._bookmark_icon.interacting():
+    # Don't trigger click callback if bookmark or downward swipe was triggered
+    swipe_down_handled = self._swipe_detector.interacting()
+    bookmark_handled = self._bookmark_icon.interacting()
+    if not (swipe_down_handled or bookmark_handled):
       super()._handle_mouse_release(mouse_pos)
 
   def _render(self, _):
@@ -278,6 +295,7 @@ class AugmentedRoadView(CameraView):
       self._confidence_ball.render(self.rect)
 
     self._bookmark_icon.render(self.rect)
+    self._swipe_detector.render(self.rect)
 
   def close(self):
     self._navigation.close()
