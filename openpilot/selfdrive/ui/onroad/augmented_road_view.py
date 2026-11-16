@@ -9,6 +9,7 @@ from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.widgets.steering_debug_panel import SteeringDebugController, VerticalSwipeDetector
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
@@ -56,6 +57,9 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self._hud_renderer = HudRenderer()
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
+    self._steering_debug = SteeringDebugController(compact=False, include_curvature=True)
+    self._swipe_detector = VerticalSwipeDetector(self._steering_debug.open_if_onroad)
+    self._swipe_detector.set_enabled(lambda: self.enabled)
 
   def _render(self, rect):
     # Only render when system is started to avoid invalid data access
@@ -103,13 +107,16 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     # Draw colored border based on driving state
     self._draw_border(rect)
 
+    # Downward swipe detector for steering response graph
+    self._swipe_detector.render(rect)
+
   def _handle_mouse_press(self, _):
-    if self._click_callback is not None:
-      self._click_callback()
+    # Sidebar toggle is deferred to release so downward swipes do not toggle the sidebar immediately.
+    pass
 
   def _handle_mouse_release(self, _):
-    # We only call click callback on press
-    pass
+    if not self._swipe_detector.interacting() and self._click_callback is not None:
+      self._click_callback()
 
   def _draw_border(self, rect: rl.Rectangle):
     rl.draw_rectangle_lines_ex(rect, UI_BORDER_SIZE, rl.BLACK)

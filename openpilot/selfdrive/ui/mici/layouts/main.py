@@ -50,8 +50,9 @@ class MiciMainLayout(Scroller):
     ])
     self._scroller.set_reset_scroll_at_show(False)
 
-    # Disable scrolling when onroad is interacting with bookmark
-    self._scroller.set_scrolling_enabled(lambda: not self._car_onroad_layout.is_swiping_left())
+    # Disable scrolling when onroad is interacting with bookmark or downward swipe
+    self._scroller.set_scrolling_enabled(lambda: not (self._car_onroad_layout.is_swiping_left() or
+                                                      self._car_onroad_layout.is_swiping_down()))
 
     # Set callbacks
     self._setup_callbacks()
